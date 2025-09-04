@@ -1,0 +1,468 @@
+service: video-conferencing-platform
+
+package:
+  patterns:
+    - '!node_modules/**'
+    - '!frontend/**'
+    - '!frontend-nextjs/**'
+    - '!scripts/**'
+    - '!database/**'
+    - '!*.md'
+    - '!webpack.config.js'
+    - '!package-lock.json'
+    - 'src/**'
+    - 'src/node_modules/**'
+
+provider:
+  name: aws
+  runtime: nodejs18.x
+  region: us-east-1
+  stage: ${opt:stage, 'dev'}
+  environment:
+    DB_HOST: video-conferencing-dev.cluster-clrcltlw1dlu.us-east-1.rds.amazonaws.com
+    DB_PORT: 5432
+    DB_NAME: video_conferencing
+    DB_USER: dbadmin
+    DB_PASSWORD: VideoConf2025!
+    COGNITO_USER_POOL_ID: us-east-1_2lpfwBcaO
+    COGNITO_CLIENT_ID: uus0oqfhqto7lo0rud3nco8a0
+    AWS_ACCOUNT_ID: 720671021642
+  iam:
+    role:
+      statements:
+        # Cognito permissions
+        - Effect: Allow
+          Action:
+            - cognito-idp:AdminGetUser
+            - cognito-idp:AdminCreateUser
+            - cognito-idp:AdminUpdateUserAttributes
+          Resource: 
+            - "arn:aws:cognito-idp:us-east-1:720671021642:userpool/us-east-1_2lpfwBcaO"
+        
+        # ChimeSDK Meetings permissions
+        - Effect: Allow
+          Action:
+            - chime:CreateMeeting
+            - chime:GetMeeting
+            - chime:DeleteMeeting
+            - chime:CreateAttendee
+            - chime:GetAttendee
+            - chime:DeleteAttendee
+            - chime:ListAttendees
+            - chime:StartMeetingTranscription
+            - chime:StopMeetingTranscription
+          Resource: "*"
+        
+        # ChimeSDK Voice permissions
+        - Effect: Allow
+          Action:
+            - chime:CreateVoiceConnector
+            - chime:GetVoiceConnector
+            - chime:ListVoiceConnectors
+            - chime:DeleteVoiceConnector
+            - chime:SearchAvailablePhoneNumbers
+            - chime:OrderPhoneNumbers
+            - chime:AssociatePhoneNumbersWithVoiceConnector
+            - chime:DisassociatePhoneNumbersFromVoiceConnector
+            - chime:CreateSipMediaApplication
+            - chime:CreateSipRule
+          Resource: "*"
+        
+        # Database permissions
+        - Effect: Allow
+          Action:
+            - rds-data:ExecuteStatement
+            - rds-data:BatchExecuteStatement
+            - rds-data:BeginTransaction
+            - rds-data:CommitTransaction
+            - rds-data:RollbackTransaction
+          Resource: "*"
+        
+        # S3 permissions for recordings
+        - Effect: Allow
+          Action:
+            - s3:GetObject
+            - s3:PutObject
+            - s3:DeleteObject
+            - s3:ListBucket
+          Resource: 
+            - "arn:aws:s3:::video-conferencing-platform-recordings-dev-720671021642"
+            - "arn:aws:s3:::video-conferencing-platform-recordings-dev-720671021642/*"
+        
+        # SNS permissions for notifications
+        - Effect: Allow
+          Action:
+            - sns:Publish
+            - sns:Subscribe
+            - sns:Unsubscribe
+          Resource: "*"
+        
+        # SQS permissions for message processing
+        - Effect: Allow
+          Action:
+            - sqs:SendMessage
+            - sqs:ReceiveMessage
+            - sqs:DeleteMessage
+            - sqs:GetQueueAttributes
+          Resource: "*"
+
+functions:
+  auth:
+    handler: src/lambda/auth.handler
+    events:
+      - http:
+          path: /auth
+          method: get
+          cors:
+            origin: 'http://localhost:3000'
+            headers:
+              - Content-Type
+              - X-Amz-Date
+              - Authorization
+              - X-Api-Key
+              - X-Amz-Security-Token
+              - X-Amz-User-Agent
+            allowCredentials: true
+
+  create-meeting:
+    handler: src/lambda/create-meeting.handler
+    events:
+      - http:
+          path: /meetings
+          method: post
+          cors:
+            origin: 'http://localhost:3000'
+            headers:
+              - Content-Type
+              - X-Amz-Date
+              - Authorization
+              - X-Api-Key
+              - X-Amz-Security-Token
+              - X-Amz-User-Agent
+            allowCredentials: true
+
+  get-meetings:
+    handler: src/lambda/get-meetings.handler
+    events:
+      - http:
+          path: /meetings
+          method: get
+          cors:
+            origin: 'http://localhost:3000'
+            headers:
+              - Content-Type
+              - X-Amz-Date
+              - Authorization
+              - X-Api-Key
+              - X-Amz-Security-Token
+              - X-Amz-User-Agent
+            allowCredentials: true
+      - http:
+          path: /meetings/{meetingId}
+          method: get
+          cors:
+            origin: 'http://localhost:3000'
+            headers:
+              - Content-Type
+              - X-Amz-Date
+              - Authorization
+              - X-Api-Key
+              - X-Amz-Security-Token
+              - X-Amz-User-Agent
+            allowCredentials: true
+
+  join-meeting:
+    handler: src/lambda/join-meeting.handler
+    events:
+      - http:
+          path: /meetings/join
+          method: post
+          cors:
+            origin: 'http://localhost:3000'
+            headers:
+              - Content-Type
+              - X-Amz-Date
+              - Authorization
+              - X-Api-Key
+              - X-Amz-Security-Token
+              - X-Amz-User-Agent
+            allowCredentials: true
+
+  end-meeting:
+    handler: src/lambda/end-meeting.handler
+    events:
+      - http:
+          path: /meetings/{id}/end
+          method: post
+          cors:
+            origin: 'http://localhost:3000'
+            headers:
+              - Content-Type
+              - X-Amz-Date
+              - Authorization
+              - X-Api-Key
+              - X-Amz-Security-Token
+              - X-Amz-User-Agent
+            allowCredentials: true
+
+  chime-voice:
+    handler: src/lambda/chime-voice.handler
+    events:
+      - http:
+          path: /voice-connectors
+          method: get
+          cors:
+            origin: 'http://localhost:3000'
+            headers:
+              - Content-Type
+              - X-Amz-Date
+              - Authorization
+              - X-Api-Key
+              - X-Amz-Security-Token
+              - X-Amz-User-Agent
+            allowCredentials: true
+      - http:
+          path: /voice-connectors
+          method: post
+          cors:
+            origin: 'http://localhost:3000'
+            headers:
+              - Content-Type
+              - X-Amz-Date
+              - Authorization
+              - X-Api-Key
+              - X-Amz-Security-Token
+              - X-Amz-User-Agent
+            allowCredentials: true
+      - http:
+          path: /voice-connectors/{id}/phone-numbers
+          method: post
+          cors:
+            origin: 'http://localhost:3000'
+            headers:
+              - Content-Type
+              - X-Amz-Date
+              - Authorization
+              - X-Api-Key
+              - X-Amz-Security-Token
+              - X-Amz-User-Agent
+            allowCredentials: true
+      - http:
+          path: /phone-numbers/search
+          method: get
+          cors:
+            origin: 'http://localhost:3000'
+            headers:
+              - Content-Type
+              - X-Amz-Date
+              - Authorization
+              - X-Api-Key
+              - X-Amz-Security-Token
+              - X-Amz-User-Agent
+            allowCredentials: true
+      - http:
+          path: /phone-numbers/order
+          method: post
+          cors:
+            origin: 'http://localhost:3000'
+            headers:
+              - Content-Type
+              - X-Amz-Date
+              - Authorization
+              - X-Api-Key
+              - X-Amz-Security-Token
+              - X-Amz-User-Agent
+            allowCredentials: true
+      - http:
+          path: /sip-media-applications
+          method: post
+          cors:
+            origin: 'http://localhost:3000'
+            headers:
+              - Content-Type
+              - X-Amz-Date
+              - Authorization
+              - X-Api-Key
+              - X-Amz-Security-Token
+              - X-Amz-User-Agent
+            allowCredentials: true
+      - http:
+          path: /sip-rules
+          method: post
+          cors:
+            origin: 'http://localhost:3000'
+            headers:
+              - Content-Type
+              - X-Amz-Date
+              - Authorization
+              - X-Api-Key
+              - X-Amz-Security-Token
+              - X-Amz-User-Agent
+            allowCredentials: true
+
+  chat:
+    handler: src/lambda/chat.handler
+    events:
+      - http:
+          path: /meetings/{id}/chat
+          method: get
+          cors:
+            origin: 'http://localhost:3000'
+            headers:
+              - Content-Type
+              - X-Amz-Date
+              - Authorization
+              - X-Api-Key
+              - X-Amz-Security-Token
+              - X-Amz-User-Agent
+            allowCredentials: true
+      - http:
+          path: /meetings/{id}/chat
+          method: post
+          cors:
+            origin: 'http://localhost:3000'
+            headers:
+              - Content-Type
+              - X-Amz-Date
+              - Authorization
+              - X-Api-Key
+              - X-Amz-Security-Token
+              - X-Amz-User-Agent
+            allowCredentials: true
+
+  recordings:
+    handler: src/lambda/recordings.handler
+    events:
+      - http:
+          path: /meetings/{id}/recordings
+          method: get
+          cors:
+            origin: 'http://localhost:3000'
+            headers:
+              - Content-Type
+              - X-Amz-Date
+              - Authorization
+              - X-Api-Key
+              - X-Amz-Security-Token
+              - X-Amz-User-Agent
+            allowCredentials: true
+      - http:
+          path: /meetings/{id}/recordings/start
+          method: post
+          cors:
+            origin: 'http://localhost:3000'
+            headers:
+              - Content-Type
+              - X-Amz-Date
+              - Authorization
+              - X-Api-Key
+              - X-Amz-Security-Token
+              - X-Amz-User-Agent
+            allowCredentials: true
+      - http:
+          path: /meetings/{id}/recordings/stop
+          method: post
+          cors:
+            origin: 'http://localhost:3000'
+            headers:
+              - Content-Type
+              - X-Amz-Date
+              - Authorization
+              - X-Api-Key
+              - X-Amz-Security-Token
+              - X-Amz-User-Agent
+            allowCredentials: true
+
+
+
+  # SQS handler for meeting notifications
+  meeting-notifications:
+    handler: src/lambda/meeting-notifications.handler
+    events:
+      - sqs:
+          arn: !GetAtt MeetingNotificationsQueue.Arn
+          batchSize: 1
+
+resources:
+  Resources:
+    # API Gateway
+    ApiGatewayRestApi:
+      Type: AWS::ApiGateway::RestApi
+      Properties:
+        Name: ${self:service}-${self:provider.stage}
+        Description: Video Conferencing Platform API with ChimeSDK Integration
+
+    # S3 Bucket for recordings
+    RecordingsBucket:
+      Type: AWS::S3::Bucket
+      Properties:
+        BucketName: video-conferencing-platform-recordings-dev-720671021642
+        CorsConfiguration:
+          CorsRules:
+            - AllowedHeaders: ['*']
+              AllowedMethods: [GET, POST, PUT, DELETE]
+              AllowedOrigins: ['*']
+              MaxAge: 3000
+
+    # SNS Topic for meeting notifications
+    MeetingNotificationsTopic:
+      Type: AWS::SNS::Topic
+      Properties:
+        TopicName: ${self:service}-meeting-notifications-${self:provider.stage}
+        DisplayName: Video Conferencing Meeting Notifications
+
+    # SQS Queue for meeting notifications
+    MeetingNotificationsQueue:
+      Type: AWS::SQS::Queue
+      Properties:
+        QueueName: ${self:service}-meeting-notifications-${self:provider.stage}
+        MessageRetentionPeriod: 1209600
+        RedrivePolicy:
+          deadLetterTargetArn: !GetAtt MeetingNotificationsDLQ.Arn
+          maxReceiveCount: 3
+
+    # Dead Letter Queue for failed notifications
+    MeetingNotificationsDLQ:
+      Type: AWS::SQS::Queue
+      Properties:
+        QueueName: ${self:service}-meeting-notifications-dlq-${self:provider.stage}
+        MessageRetentionPeriod: 1209600
+
+    # CloudWatch Log Group
+    LogGroup:
+      Type: AWS::Logs::LogGroup
+      Properties:
+        LogGroupName: /aws/lambda/${self:service}-${self:provider.stage}
+        RetentionInDays: 14
+
+  Outputs:
+    ApiGatewayRestApiId:
+      Description: API Gateway REST API ID
+      Value: !Ref ApiGatewayRestApi
+      Export:
+        Name: ${self:service}-${self:provider.stage}-api-id
+
+    ApiGatewayRestApiRootResourceId:
+      Description: API Gateway REST API Root Resource ID
+      Value: !GetAtt ApiGatewayRestApi.RootResourceId
+      Export:
+        Name: ${self:service}-${self:provider.stage}-api-root-resource-id
+
+    RecordingsBucketName:
+      Description: S3 Bucket for recordings
+      Value: !Ref RecordingsBucket
+      Export:
+        Name: ${self:service}-${self:provider.stage}-recordings-bucket
+
+    MeetingNotificationsTopicArn:
+      Description: SNS Topic for meeting notifications
+      Value: !Ref MeetingNotificationsTopic
+      Export:
+        Name: ${self:service}-${self:provider.stage}-sns-topic
+
+    MeetingNotificationsQueueUrl:
+      Description: SQS Queue for meeting notifications
+      Value: !Ref MeetingNotificationsQueue
+      Export:
+        Name: ${self:service}-${self:provider.stage}-sqs-queue
+

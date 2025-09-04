@@ -1,0 +1,49 @@
+{
+  "mcpServers": {
+    "aws-core": {
+      "command": "awslabs.core-mcp-server",
+      "args": [],
+      "env": {
+        "AWS_REGION": "us-east-1"
+      }
+    },
+    "aws-serverless": {
+      "command": "awslabs.aws-serverless-mcp-server",
+      "args": [],
+      "env": {
+        "AWS_REGION": "us-east-1"
+      }
+    },
+    "aws-lambda-tool": {
+      "command": "awslabs.lambda-tool-mcp-server",
+      "args": [],
+      "env": {
+        "AWS_REGION": "us-east-1"
+      }
+    },
+    "aws-cdk": {
+      "command": "awslabs.cdk-mcp-server",
+      "args": [],
+      "env": {
+        "AWS_REGION": "us-east-1"
+      }
+    },
+    "aws-documentation": {
+      "command": "awslabs.aws-documentation-mcp-server",
+      "args": [],
+      "env": {
+        "AWS_REGION": "us-east-1"
+      }
+    },
+    "aws-knowledge": {
+      "command": "https://aws-mcp-knowledge.awslabs.com",
+      "args": [],
+      "env": {}
+    }
+  },
+  "project": {
+    "name": "ChimeSDK Video Project",
+    "description": "AWS MCP servers for ChimeSDK video operations",
+    "environment": "development"
+  }
+}

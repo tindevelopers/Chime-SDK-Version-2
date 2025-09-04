@@ -1,0 +1,43 @@
+{
+  "mcpServers": {
+    "aws-core": {
+      "command": "awslabs.core-mcp-server",
+      "description": "AWS Core MCP Server - Provides foundational AWS API access for ChimeSDK operations"
+    },
+    "aws-serverless": {
+      "command": "awslabs.aws-serverless-mcp-server",
+      "description": "AWS Serverless MCP Server - Manages serverless architecture for ChimeSDK Lambda functions"
+    },
+    "aws-lambda-tool": {
+      "command": "awslabs.lambda-tool-mcp-server",
+      "description": "AWS Lambda Tool MCP Server - Executes and manages Lambda functions for ChimeSDK operations"
+    },
+    "aws-cdk": {
+      "command": "awslabs.cdk-mcp-server",
+      "description": "AWS CDK MCP Server - Infrastructure as Code for ChimeSDK deployments"
+    },
+    "aws-documentation": {
+      "command": "awslabs.aws-documentation-mcp-server",
+      "description": "AWS Documentation MCP Server - Local access to comprehensive AWS and ChimeSDK documentation"
+    },
+    "aws-knowledge": {
+      "command": "https://aws-mcp-knowledge.awslabs.com",
+      "description": "AWS Knowledge MCP Server - Real-time access to latest AWS documentation and best practices (remote)"
+    }
+  },
+  "environment": {
+    "AWS_REGION": "us-east-1",
+    "AWS_PROFILE": "default"
+  },
+  "chimeSDK": {
+    "services": [
+      "chime-sdk-meetings",
+      "chime-sdk-voice",
+      "chime-sdk-messaging",
+      "lambda",
+      "iam",
+      "s3",
+      "cloudwatch"
+    ]
+  }
+}

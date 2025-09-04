@@ -1,0 +1,39 @@
+# ChimeSDK Video Project - MCP Configuration
+
+## AWS MCP Servers Configuration
+
+This project uses the following AWS MCP servers for ChimeSDK operations:
+
+1. **AWS Core MCP Server** - Foundational AWS API access
+2. **AWS Serverless MCP Server** - Serverless architecture management  
+3. **AWS Lambda Tool MCP Server** - Lambda function execution
+4. **AWS CDK MCP Server** - Infrastructure as Code
+5. **AWS Documentation MCP Server** - Local AWS documentation
+6. **AWS Knowledge MCP Server** - Real-time AWS documentation
+
+## Environment Configuration
+
+- Development environment variables: `env-configs/development/.env`
+- Staging environment variables: `env-configs/staging/.env`
+- Production environment variables: `env-configs/production/.env`
+
+## ChimeSDK Services Available
+
+- ChimeSDK Meetings API
+- ChimeSDK Voice API
+- Lambda Functions
+- IAM Roles and Policies
+- S3 Buckets (for recordings)
+- CloudWatch Logs and Metrics
+- API Gateway
+- Cognito (for authentication)
+
+## Usage Instructions
+
+When working with this project, use the AWS MCP servers to:
+- Create and manage ChimeSDK meetings
+- Handle voice calls and PSTN operations
+- Deploy infrastructure with CDK
+- Execute Lambda functions
+- Access AWS documentation
+- Manage AWS resources

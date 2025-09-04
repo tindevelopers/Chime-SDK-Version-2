@@ -1,0 +1,23 @@
+{
+  "version": 2,
+  "builds": [
+    {
+      "src": "frontend-nextjs/package.json",
+      "use": "@vercel/next"
+    }
+  ],
+  "routes": [
+    {
+      "src": "/(.*)",
+      "dest": "/frontend-nextjs/$1"
+    }
+  ],
+  "env": {
+    "NEXT_PUBLIC_API_URL": "https://xxzrb5vqse.execute-api.us-east-1.amazonaws.com/dev"
+  },
+  "functions": {
+    "frontend-nextjs/src/app/**/*.tsx": {
+      "maxDuration": 30
+    }
+  }
+}
