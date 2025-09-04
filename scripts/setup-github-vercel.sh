@@ -42,6 +42,7 @@ echo ""
 echo "📖 Documentation: DEPLOYMENT.md"
 echo "🔗 GitHub Actions: .github/workflows/deploy.yml"
 echo "⚙️  Vercel Config: vercel.json"
+echo "🧹 Clean Project: ./scripts/clean-project.sh"
 echo ""
 
 # Check if we're ready to deploy

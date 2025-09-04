@@ -9,6 +9,8 @@ package:
     - '!database/**'
     - '!*.md'
     - '!webpack.config.js'
+  - '!frontend/'
+  - '!frontend-nextjs/node_modules/'
     - '!package-lock.json'
     - 'src/**'
     - 'src/node_modules/**'

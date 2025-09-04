@@ -116,6 +116,9 @@ Thumbs.db
 mcp-servers/*/node_modules/
 mcp-servers/*/dist/
 
+# Old frontend (removed)
+frontend/
+
 # Local development
 .env.local
 .env.development.local
