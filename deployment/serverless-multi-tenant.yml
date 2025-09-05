@@ -1,0 +1,146 @@
+service: video-conferencing-${param:tenantName}
+
+package:
+  patterns:
+    - '!node_modules/**'
+    - '!frontend/**'
+    - '!frontend-nextjs/**'
+    - '!scripts/**'
+    - '!database/**'
+    - '!*.md'
+    - 'src/**'
+
+provider:
+  name: aws
+  runtime: nodejs18.x
+  region: ${opt:region, 'us-east-1'}
+  stage: ${opt:stage, 'dev'}
+  deploymentBucket:
+    name: ${param:tenantName}-serverless-deployments-${aws:region}
+  environment:
+    TENANT_NAME: ${param:tenantName}
+    DYNAMODB_TABLE_NAME: ${param:tenantName}-video-conferencing-meetings-${self:provider.stage}
+    AWS_ACCOUNT_ID: ${param:awsAccountId}
+  iam:
+    role:
+      statements:
+        # ChimeSDK Meetings permissions
+        - Effect: Allow
+          Action:
+            - chime:CreateMeeting
+            - chime:GetMeeting
+            - chime:DeleteMeeting
+            - chime:CreateAttendee
+            - chime:GetAttendee
+            - chime:DeleteAttendee
+            - chime:ListMeetings
+            - chime:ListAttendees
+            - chime:BatchCreateAttendee
+            - chime:BatchUpdateAttendeeCapabilitiesExcept
+          Resource: "*"
+        
+        # DynamoDB permissions
+        - Effect: Allow
+          Action:
+            - dynamodb:Query
+            - dynamodb:Scan
+            - dynamodb:GetItem
+            - dynamodb:PutItem
+            - dynamodb:UpdateItem
+            - dynamodb:DeleteItem
+          Resource: 
+            - "arn:aws:dynamodb:${aws:region}:${aws:accountId}:table/${param:tenantName}-video-conferencing-meetings-${self:provider.stage}"
+            - "arn:aws:dynamodb:${aws:region}:${aws:accountId}:table/${param:tenantName}-video-conferencing-meetings-${self:provider.stage}/index/*"
+
+functions:
+  create-meeting:
+    handler: src/lambda/create-meeting.handler
+    timeout: 30
+    events:
+      - http:
+          path: /meetings
+          method: post
+          cors:
+            origin: '*'
+            headers:
+              - Content-Type
+              - Authorization
+              - X-Amz-Date
+              - X-Api-Key
+              - X-Amz-Security-Token
+              - X-Amz-User-Agent
+            allowCredentials: false
+
+  get-meetings:
+    handler: src/lambda/get-meetings.handler
+    timeout: 30
+    events:
+      - http:
+          path: /meetings
+          method: get
+          cors:
+            origin: '*'
+            headers:
+              - Content-Type
+              - Authorization
+            allowCredentials: false
+      - http:
+          path: /meetings/{id}
+          method: get
+          cors:
+            origin: '*'
+            headers:
+              - Content-Type
+              - Authorization
+            allowCredentials: false
+
+  keep-db-warm:
+    handler: src/lambda/keep-db-warm.handler
+    events:
+      - schedule: rate(5 minutes)
+
+resources:
+  Resources:
+    # DynamoDB Table for storing meeting data
+    MeetingsTable:
+      Type: AWS::DynamoDB::Table
+      Properties:
+        TableName: ${param:tenantName}-video-conferencing-meetings-${self:provider.stage}
+        BillingMode: PAY_PER_REQUEST
+        AttributeDefinitions:
+          - AttributeName: pk
+            AttributeType: S
+          - AttributeName: sk
+            AttributeType: S
+          - AttributeName: created_by
+            AttributeType: S
+        KeySchema:
+          - AttributeName: pk
+            KeyType: HASH
+          - AttributeName: sk
+            KeyType: RANGE
+        GlobalSecondaryIndexes:
+          - IndexName: createdBy-index
+            KeySchema:
+              - AttributeName: created_by
+                KeyType: HASH
+            Projection:
+              ProjectionType: ALL
+        TimeToLiveSpecification:
+          AttributeName: ttl
+          Enabled: true
+        StreamSpecification:
+          StreamViewType: NEW_AND_OLD_IMAGES
+
+  Outputs:
+    ApiGatewayUrl:
+      Description: API Gateway URL
+      Value: !Sub "https://${RestApiApigEvent}.execute-api.${AWS::Region}.amazonaws.com/${self:provider.stage}"
+      Export:
+        Name: ${param:tenantName}-video-conferencing-api-url-${self:provider.stage}
+    
+    DynamoDBTableName:
+      Description: DynamoDB Table Name
+      Value: !Ref MeetingsTable
+      Export:
+        Name: ${param:tenantName}-video-conferencing-table-${self:provider.stage}

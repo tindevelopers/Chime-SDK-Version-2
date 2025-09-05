@@ -1,14 +1,8 @@
-const { Pool } = require('pg');
+const { ChimeSDKMeetingsClient, CreateAttendeeCommand } = require('@aws-sdk/client-chime-sdk-meetings');
+const dynamoStore = require('./dynamodb-store');
 
-// Database connection
-const pool = new Pool({
-  host: process.env.DB_HOST,
-  port: process.env.DB_PORT,
-  database: process.env.DB_NAME,
-  user: process.env.DB_USER,
-  password: process.env.DB_PASSWORD,
-  ssl: { rejectUnauthorized: false }
-});
+// Initialize ChimeSDK client
+const chimeSDKMeetings = new ChimeSDKMeetingsClient({ region: 'us-east-1' });
 
 // Helper function to verify JWT token
 async function verifyToken(event) {
@@ -28,54 +22,42 @@ async function verifyToken(event) {
   }
 }
 
-// Get user's meetings
-async function getUserMeetings(userId) {
-  const client = await pool.connect();
-  
+// Create a NEW attendee for a user joining an existing meeting
+async function createChimeAttendee(meetingId, userId, userEmail) {
   try {
-    const result = await client.query(`
-      SELECT 
-        m.*,
-        COUNT(mp.id) as participant_count
-      FROM meetings m
-      LEFT JOIN meeting_participants mp ON m.id = mp.meeting_id AND mp.is_active = true
-      WHERE m.created_by = $1
-      GROUP BY m.id
-      ORDER BY m.created_at DESC
-    `, [userId]);
-    
-    return result.rows;
-  } finally {
-    client.release();
+    const params = {
+      MeetingId: meetingId,
+      ExternalUserId: userId, // This makes each attendee unique per user
+      Capabilities: {
+        Audio: 'SendReceive',
+        Video: 'SendReceive',
+        Content: 'SendReceive'
+      }
+    };
+
+    console.log('🔄 Creating NEW ChimeSDK attendee for user:', userId);
+    const command = new CreateAttendeeCommand(params);
+    const result = await chimeSDKMeetings.send(command);
+    console.log('✅ NEW ChimeSDK attendee created:', result.Attendee.AttendeeId);
+    return result.Attendee;
+  } catch (error) {
+    console.error('❌ Error creating ChimeSDK attendee:', error);
+    throw error;
   }
 }
 
-// Get meeting details by ID
+// Get user's meetings from DynamoDB
+async function getUserMeetings(userId) {
+  return await dynamoStore.getUserMeetings(userId);
+}
+
+// Get meeting details by ID from DynamoDB
 async function getMeetingById(meetingId) {
-  const client = await pool.connect();
-  try {
-    const result = await client.query(`
-      SELECT 
-        m.*,
-        u.email as creator_email,
-        u.first_name as creator_first_name,
-        u.last_name as creator_last_name,
-        COUNT(mp.id) as participant_count
-      FROM meetings m
-      LEFT JOIN users u ON m.created_by = u.id
-      LEFT JOIN meeting_participants mp ON m.id = mp.meeting_id AND mp.is_active = true
-      WHERE m.id = $1
-      GROUP BY m.id, u.email, u.first_name, u.last_name
-    `, [meetingId]);
-    
-    if (result.rows.length === 0) {
-      throw new Error('Meeting not found');
-    }
-    
-    return result.rows[0];
-  } finally {
-    client.release();
+  const meeting = await dynamoStore.getMeeting(meetingId);
+  if (!meeting) {
+    throw new Error('Meeting not found');
   }
+  return meeting;
 }
 
 // Main handler
@@ -85,7 +67,7 @@ exports.handler = async (event) => {
     return {
       statusCode: 200,
       headers: {
-        'Access-Control-Allow-Origin': 'http://localhost:3000',
+        'Access-Control-Allow-Origin': '*',
         'Access-Control-Allow-Headers': 'Content-Type,Authorization,X-Amz-Date,X-Api-Key,X-Amz-Security-Token,X-Amz-User-Agent',
         'Access-Control-Allow-Methods': 'GET,POST,PUT,DELETE,OPTIONS',
         'Access-Control-Allow-Credentials': 'true'
@@ -101,66 +83,79 @@ exports.handler = async (event) => {
     console.log('User authenticated:', user);
     
     // Check if this is a request for a specific meeting
-    // Since the new route might not be deployed, check both pathParameters and queryStringParameters
-    const meetingId = event.pathParameters?.meetingId || event.queryStringParameters?.meetingId;
+    const meetingId = event.pathParameters?.id || event.pathParameters?.meetingId || event.queryStringParameters?.meetingId;
     
     if (meetingId) {
-      // Get specific meeting details
+      // Get specific meeting details from in-memory store
       console.log('Fetching meeting details for ID:', meetingId);
       
       const meeting = await getMeetingById(meetingId);
-      console.log('Meeting details retrieved:', meeting);
+      console.log('✅ Meeting details retrieved from store:', meeting.id);
+      
+      // CRITICAL FIX: Create a NEW attendee for this user joining the meeting
+      // Don't reuse the creator's attendee data
+      console.log('🔄 Creating NEW attendee for user joining meeting...');
+      
+      let newAttendee;
+      try {
+        newAttendee = await createChimeAttendee(
+          meeting.chime_meeting_id,
+          user.cognito_user_id,
+          user.email
+        );
+        console.log('✅ NEW attendee created for user:', user.cognito_user_id);
+      } catch (attendeeError) {
+        console.error('❌ Failed to create new attendee:', attendeeError);
+        throw new Error(`Failed to join meeting: ${attendeeError.message}`);
+      }
+      
+      // Return meeting data with the NEW attendee (not the creator's attendee)
+      const meetingDataForUser = {
+        ...meeting,
+        // Replace the creator's attendee with the new attendee for this user
+        chime_attendee: newAttendee,
+        // Keep the original meeting data but provide fresh attendee data
+        participant_role: meeting.created_by === user.cognito_user_id ? 'creator' : 'participant'
+      };
       
       return {
         statusCode: 200,
         headers: {
           'Content-Type': 'application/json',
-          'Access-Control-Allow-Origin': 'http://localhost:3000',
+          'Access-Control-Allow-Origin': '*',
           'Access-Control-Allow-Headers': 'Content-Type,Authorization,X-Amz-Date,X-Api-Key,X-Amz-Security-Token,X-Amz-User-Agent',
           'Access-Control-Allow-Methods': 'GET,POST,PUT,DELETE,OPTIONS',
           'Access-Control-Allow-Credentials': 'true'
         },
-        body: JSON.stringify(meeting)
+        body: JSON.stringify({
+          ...meetingDataForUser,
+          source: 'dynamodb-with-new-attendee',
+          success: true,
+          message: 'Meeting details with fresh attendee credentials - ready to join!'
+        })
       };
     }
     
-    // Get all meetings for user
-    const client = await pool.connect();
-    try {
-      const userResult = await client.query(`
-        SELECT * FROM users WHERE cognito_user_id = $1
-      `, [user.cognito_user_id]);
-      
-      if (userResult.rows.length === 0) {
-        // Create user if doesn't exist
-        await client.query(`
-          INSERT INTO users (cognito_user_id, email, first_name, last_name)
-          VALUES ($1, $2, $3, $4)
-        `, [user.cognito_user_id, user.email, '', '']);
-      }
-      
-      const userId = userResult.rows[0]?.id || (await client.query(`
-        SELECT id FROM users WHERE cognito_user_id = $1
-      `, [user.cognito_user_id])).rows[0].id;
-      
-      const result = await getUserMeetings(userId);
-      console.log('Retrieved meetings for user:', result);
-      
-      return {
-        statusCode: 200,
-        headers: {
-          'Content-Type': 'application/json',
-          'Access-Control-Allow-Origin': 'http://localhost:3000',
-          'Access-Control-Allow-Headers': 'Content-Type,Authorization,X-Amz-Date,X-Api-Key,X-Amz-Security-Token,X-Amz-User-Agent',
-          'Access-Control-Allow-Methods': 'GET,POST,PUT,DELETE,OPTIONS',
-          'Access-Control-Allow-Credentials': 'true'
-        },
-        body: JSON.stringify(result)
-      };
-      
-    } finally {
-      client.release();
-    }
+    // Get all meetings for user from in-memory store
+    const meetings = await getUserMeetings(user.cognito_user_id);
+    console.log(`✅ Retrieved ${meetings.length} meetings from store for user:`, user.cognito_user_id);
+    
+    return {
+      statusCode: 200,
+      headers: {
+        'Content-Type': 'application/json',
+        'Access-Control-Allow-Origin': '*',
+        'Access-Control-Allow-Headers': 'Content-Type,Authorization,X-Amz-Date,X-Api-Key,X-Amz-Security-Token,X-Amz-User-Agent',
+        'Access-Control-Allow-Methods': 'GET,POST,PUT,DELETE,OPTIONS',
+        'Access-Control-Allow-Credentials': 'true'
+      },
+      body: JSON.stringify({
+        meetings: meetings,
+        source: 'dynamodb',
+        success: true,
+        count: meetings.length
+      })
+    };
     
   } catch (error) {
     console.error('Error:', error);
@@ -169,7 +164,7 @@ exports.handler = async (event) => {
       statusCode: error.message.includes('not found') ? 404 : 400,
       headers: {
         'Content-Type': 'application/json',
-        'Access-Control-Allow-Origin': 'http://localhost:3000',
+        'Access-Control-Allow-Origin': '*',
         'Access-Control-Allow-Headers': 'Content-Type,Authorization,X-Amz-Date,X-Api-Key,X-Amz-Security-Token,X-Amz-User-Agent',
         'Access-Control-Allow-Methods': 'GET,POST,PUT,DELETE,OPTIONS',
         'Access-Control-Allow-Credentials': 'true'

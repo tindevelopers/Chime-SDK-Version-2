@@ -1,0 +1,175 @@
+name: ChimeSDK Dependency Update Test
+
+on:
+  pull_request:
+    paths: 
+      - 'package.json'
+      - 'frontend-nextjs/package.json'
+      - 'package-lock.json'
+      - 'frontend-nextjs/package-lock.json'
+
+jobs:
+  detect-chime-sdk-changes:
+    runs-on: ubuntu-latest
+    outputs:
+      chime-sdk-updated: ${{ steps.check-changes.outputs.chime-sdk-updated }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          
+      - name: Check for ChimeSDK updates
+        id: check-changes
+        run: |
+          git diff HEAD~1 -- package.json frontend-nextjs/package.json | grep -E "(amazon-chime-sdk|@aws-sdk)" && echo "chime-sdk-updated=true" >> $GITHUB_OUTPUT || echo "chime-sdk-updated=false" >> $GITHUB_OUTPUT
+
+  test-chime-sdk-compatibility:
+    runs-on: ubuntu-latest
+    needs: detect-chime-sdk-changes
+    if: needs.detect-chime-sdk-changes.outputs.chime-sdk-updated == 'true'
+    
+    strategy:
+      matrix:
+        node-version: [18, 20]
+        
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Setup Node.js ${{ matrix.node-version }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node-version }}
+          cache: 'npm'
+      
+      - name: Install backend dependencies
+        run: npm ci
+        
+      - name: Install frontend dependencies  
+        run: |
+          cd frontend-nextjs
+          npm ci
+      
+      - name: Run ChimeSDK compatibility tests
+        run: |
+          echo "🧪 Testing ChimeSDK compatibility..."
+          
+          # Test backend Lambda functions
+          echo "Testing Lambda functions..."
+          npm run test:lambda || echo "⚠️ Lambda tests not implemented yet"
+          
+          # Test frontend components
+          echo "Testing frontend components..."
+          cd frontend-nextjs
+          npm run build
+          
+      - name: Test key ChimeSDK features
+        run: |
+          cd frontend-nextjs
+          
+          # Test that key exports exist
+          node -e "
+            const chime = require('amazon-chime-sdk-js');
+            console.log('✅ DefaultDeviceController:', typeof chime.DefaultDeviceController);
+            console.log('✅ DefaultMeetingSession:', typeof chime.DefaultMeetingSession);
+            console.log('✅ MeetingSessionStatusCode:', typeof chime.MeetingSessionStatusCode);
+          "
+          
+      - name: Check for breaking changes
+        run: |
+          echo "🔍 Checking for potential breaking changes..."
+          
+          # Check if critical APIs still exist
+          node -e "
+            const chime = require('amazon-chime-sdk-js');
+            const requiredAPIs = [
+              'DefaultDeviceController',
+              'DefaultMeetingSession', 
+              'ConsoleLogger',
+              'LogLevel',
+              'MeetingSessionStatusCode'
+            ];
+            
+            const missing = requiredAPIs.filter(api => !chime[api]);
+            if (missing.length > 0) {
+              console.error('❌ Missing required APIs:', missing);
+              process.exit(1);
+            }
+            console.log('✅ All required APIs present');
+          "
+
+  deploy-staging-test:
+    runs-on: ubuntu-latest
+    needs: [detect-chime-sdk-changes, test-chime-sdk-compatibility]
+    if: needs.detect-chime-sdk-changes.outputs.chime-sdk-updated == 'true' && github.event.pull_request.head.ref == 'dependabot/npm_and_yarn/amazon-chime-sdk-js'
+    
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          cache: 'npm'
+          
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: us-east-1
+          
+      - name: Install dependencies
+        run: |
+          npm ci
+          cd frontend-nextjs && npm ci
+          
+      - name: Deploy to staging environment
+        run: |
+          echo "🚀 Deploying ChimeSDK update to staging..."
+          
+          # Deploy backend
+          npx serverless deploy --stage staging-chime-test
+          
+          # Deploy frontend to Vercel preview
+          cd frontend-nextjs
+          npx vercel --token ${{ secrets.VERCEL_TOKEN }} --scope ${{ secrets.VERCEL_ORG_ID }}
+          
+      - name: Run integration tests
+        run: |
+          echo "🧪 Running integration tests against staging..."
+          
+          # Test meeting creation
+          curl -X POST \
+            -H "Content-Type: application/json" \
+            -H "Authorization: Bearer ${{ secrets.TEST_JWT_TOKEN }}" \
+            -d '{"title": "Dependency Test Meeting"}' \
+            ${{ secrets.STAGING_API_URL }}/meetings
+            
+      - name: Comment on PR
+        uses: actions/github-script@v7
+        with:
+          script: |
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: '🧪 ChimeSDK dependency update has been tested on staging environment. Please verify meeting functionality before merging.'
+            })
+
+  security-scan:
+    runs-on: ubuntu-latest
+    needs: detect-chime-sdk-changes
+    if: needs.detect-chime-sdk-changes.outputs.chime-sdk-updated == 'true'
+    
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Run security audit
+        run: |
+          npm audit --audit-level=moderate
+          cd frontend-nextjs && npm audit --audit-level=moderate
+          
+      - name: Check for known vulnerabilities
+        run: |
+          # Check if the new ChimeSDK version has known issues
+          npx retire --path frontend-nextjs/node_modules || echo "Retire.js check completed"

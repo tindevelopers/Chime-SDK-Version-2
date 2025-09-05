@@ -1,0 +1,34 @@
+# Multi-Tenant Configuration Template
+# Copy this file and customize for each tenant
+
+tenant:
+  name: "customer-name"           # e.g., "acme-corp"
+  stage: "production"             # dev, staging, production
+  region: "us-east-1"            # AWS region
+  
+aws:
+  account_id: "123456789012"     # Target AWS Account ID
+  profile: "customer-profile"     # AWS CLI profile name
+  
+domain:
+  frontend: "video.customer.com"  # Custom domain for frontend
+  api: "api.video.customer.com"   # Custom domain for API Gateway
+  
+database:
+  # DynamoDB configuration (recommended for serverless)
+  table_prefix: "customer-video"  # Prefix for table names
+  ttl_hours: 24                   # Meeting data retention
+  
+features:
+  max_participants: 50            # Per meeting limit
+  recording_enabled: true         # Enable/disable recording
+  screen_share: true              # Enable/disable screen sharing
+  
+branding:
+  company_name: "Customer Corp"
+  logo_url: "https://customer.com/logo.png"
+  primary_color: "#1e40af"
+  
+notifications:
+  email_notifications: true
+  webhook_url: "https://customer.com/webhooks/video"

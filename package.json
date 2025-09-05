@@ -13,12 +13,15 @@
     "frontend:dev": "cd frontend-nextjs && npm run dev",
     "frontend:build": "cd frontend-nextjs && npm run build",
     "frontend:start": "cd frontend-nextjs && npm start",
+    "vercel:deploy": "cd frontend-nextjs && npx vercel --prod",
+    "vercel:dev": "cd frontend-nextjs && npx vercel dev",
     "install:all": "npm install && cd frontend-nextjs && npm install",
     "clean": "rm -rf node_modules frontend-nextjs/node_modules .serverless .aws-sam"
   },
   "devDependencies": {
     "serverless": "^3.40.0",
-    "serverless-offline": "^13.3.0"
+    "serverless-offline": "^13.3.0",
+    "vercel": "^47.0.4"
   },
   "keywords": [
     "video-conferencing",

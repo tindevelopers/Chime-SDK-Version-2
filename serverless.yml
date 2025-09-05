@@ -9,8 +9,8 @@ package:
     - '!database/**'
     - '!*.md'
     - '!webpack.config.js'
-  - '!frontend/'
-  - '!frontend-nextjs/node_modules/'
+    - '!frontend/'
+    - '!frontend-nextjs/node_modules/'
     - '!package-lock.json'
     - 'src/**'
     - 'src/node_modules/**'
@@ -69,7 +69,7 @@ provider:
             - chime:CreateSipMediaApplication
             - chime:CreateSipRule
           Resource: "*"
-        
+
         # Database permissions
         - Effect: Allow
           Action:
@@ -78,8 +78,24 @@ provider:
             - rds-data:BeginTransaction
             - rds-data:CommitTransaction
             - rds-data:RollbackTransaction
+            - rds:DescribeDBClusters
+            - rds:DescribeDBInstances
+            - rds:ModifyDBCluster
           Resource: "*"
-        
+
+        # DynamoDB permissions
+        - Effect: Allow
+          Action:
+            - dynamodb:PutItem
+            - dynamodb:GetItem
+            - dynamodb:UpdateItem
+            - dynamodb:DeleteItem
+            - dynamodb:Query
+            - dynamodb:Scan
+          Resource: 
+            - arn:aws:dynamodb:${self:provider.region}:*:table/video-conferencing-meetings
+            - arn:aws:dynamodb:${self:provider.region}:*:table/video-conferencing-meetings/*
+
         # S3 permissions for recordings
         - Effect: Allow
           Action:
@@ -111,12 +127,13 @@ provider:
 functions:
   auth:
     handler: src/lambda/auth.handler
+    timeout: 30
     events:
       - http:
           path: /auth
           method: get
           cors:
-            origin: 'http://localhost:3000'
+            origin: '*'
             headers:
               - Content-Type
               - X-Amz-Date
@@ -124,16 +141,17 @@ functions:
               - X-Api-Key
               - X-Amz-Security-Token
               - X-Amz-User-Agent
-            allowCredentials: true
+            allowCredentials: false
 
   create-meeting:
     handler: src/lambda/create-meeting.handler
+    timeout: 30
     events:
       - http:
           path: /meetings
           method: post
           cors:
-            origin: 'http://localhost:3000'
+            origin: '*'
             headers:
               - Content-Type
               - X-Amz-Date
@@ -141,16 +159,17 @@ functions:
               - X-Api-Key
               - X-Amz-Security-Token
               - X-Amz-User-Agent
-            allowCredentials: true
+            allowCredentials: false
 
   get-meetings:
     handler: src/lambda/get-meetings.handler
+    timeout: 30
     events:
       - http:
           path: /meetings
           method: get
           cors:
-            origin: 'http://localhost:3000'
+            origin: '*'
             headers:
               - Content-Type
               - X-Amz-Date
@@ -158,12 +177,12 @@ functions:
               - X-Api-Key
               - X-Amz-Security-Token
               - X-Amz-User-Agent
-            allowCredentials: true
+            allowCredentials: false
       - http:
-          path: /meetings/{meetingId}
+          path: /meetings/{id}
           method: get
           cors:
-            origin: 'http://localhost:3000'
+            origin: '*'
             headers:
               - Content-Type
               - X-Amz-Date
@@ -171,7 +190,7 @@ functions:
               - X-Api-Key
               - X-Amz-Security-Token
               - X-Amz-User-Agent
-            allowCredentials: true
+            allowCredentials: false
 
   join-meeting:
     handler: src/lambda/join-meeting.handler
@@ -180,7 +199,7 @@ functions:
           path: /meetings/join
           method: post
           cors:
-            origin: 'http://localhost:3000'
+            origin: '*'
             headers:
               - Content-Type
               - X-Amz-Date
@@ -188,7 +207,7 @@ functions:
               - X-Api-Key
               - X-Amz-Security-Token
               - X-Amz-User-Agent
-            allowCredentials: true
+            allowCredentials: false
 
   end-meeting:
     handler: src/lambda/end-meeting.handler
@@ -197,7 +216,7 @@ functions:
           path: /meetings/{id}/end
           method: post
           cors:
-            origin: 'http://localhost:3000'
+            origin: '*'
             headers:
               - Content-Type
               - X-Amz-Date
@@ -205,7 +224,7 @@ functions:
               - X-Api-Key
               - X-Amz-Security-Token
               - X-Amz-User-Agent
-            allowCredentials: true
+            allowCredentials: false
 
   chime-voice:
     handler: src/lambda/chime-voice.handler
@@ -214,7 +233,7 @@ functions:
           path: /voice-connectors
           method: get
           cors:
-            origin: 'http://localhost:3000'
+            origin: '*'
             headers:
               - Content-Type
               - X-Amz-Date
@@ -222,12 +241,12 @@ functions:
               - X-Api-Key
               - X-Amz-Security-Token
               - X-Amz-User-Agent
-            allowCredentials: true
+            allowCredentials: false
       - http:
           path: /voice-connectors
           method: post
           cors:
-            origin: 'http://localhost:3000'
+            origin: '*'
             headers:
               - Content-Type
               - X-Amz-Date
@@ -235,12 +254,12 @@ functions:
               - X-Api-Key
               - X-Amz-Security-Token
               - X-Amz-User-Agent
-            allowCredentials: true
+            allowCredentials: false
       - http:
           path: /voice-connectors/{id}/phone-numbers
           method: post
           cors:
-            origin: 'http://localhost:3000'
+            origin: '*'
             headers:
               - Content-Type
               - X-Amz-Date
@@ -248,12 +267,12 @@ functions:
               - X-Api-Key
               - X-Amz-Security-Token
               - X-Amz-User-Agent
-            allowCredentials: true
+            allowCredentials: false
       - http:
           path: /phone-numbers/search
           method: get
           cors:
-            origin: 'http://localhost:3000'
+            origin: '*'
             headers:
               - Content-Type
               - X-Amz-Date
@@ -261,12 +280,12 @@ functions:
               - X-Api-Key
               - X-Amz-Security-Token
               - X-Amz-User-Agent
-            allowCredentials: true
+            allowCredentials: false
       - http:
           path: /phone-numbers/order
           method: post
           cors:
-            origin: 'http://localhost:3000'
+            origin: '*'
             headers:
               - Content-Type
               - X-Amz-Date
@@ -274,12 +293,12 @@ functions:
               - X-Api-Key
               - X-Amz-Security-Token
               - X-Amz-User-Agent
-            allowCredentials: true
+            allowCredentials: false
       - http:
           path: /sip-media-applications
           method: post
           cors:
-            origin: 'http://localhost:3000'
+            origin: '*'
             headers:
               - Content-Type
               - X-Amz-Date
@@ -287,12 +306,12 @@ functions:
               - X-Api-Key
               - X-Amz-Security-Token
               - X-Amz-User-Agent
-            allowCredentials: true
+            allowCredentials: false
       - http:
           path: /sip-rules
           method: post
           cors:
-            origin: 'http://localhost:3000'
+            origin: '*'
             headers:
               - Content-Type
               - X-Amz-Date
@@ -300,7 +319,7 @@ functions:
               - X-Api-Key
               - X-Amz-Security-Token
               - X-Amz-User-Agent
-            allowCredentials: true
+            allowCredentials: false
 
   chat:
     handler: src/lambda/chat.handler
@@ -309,7 +328,7 @@ functions:
           path: /meetings/{id}/chat
           method: get
           cors:
-            origin: 'http://localhost:3000'
+            origin: '*'
             headers:
               - Content-Type
               - X-Amz-Date
@@ -317,12 +336,12 @@ functions:
               - X-Api-Key
               - X-Amz-Security-Token
               - X-Amz-User-Agent
-            allowCredentials: true
+            allowCredentials: false
       - http:
           path: /meetings/{id}/chat
           method: post
           cors:
-            origin: 'http://localhost:3000'
+            origin: '*'
             headers:
               - Content-Type
               - X-Amz-Date
@@ -330,7 +349,7 @@ functions:
               - X-Api-Key
               - X-Amz-Security-Token
               - X-Amz-User-Agent
-            allowCredentials: true
+            allowCredentials: false
 
   recordings:
     handler: src/lambda/recordings.handler
@@ -339,7 +358,7 @@ functions:
           path: /meetings/{id}/recordings
           method: get
           cors:
-            origin: 'http://localhost:3000'
+            origin: '*'
             headers:
               - Content-Type
               - X-Amz-Date
@@ -347,12 +366,12 @@ functions:
               - X-Api-Key
               - X-Amz-Security-Token
               - X-Amz-User-Agent
-            allowCredentials: true
+            allowCredentials: false
       - http:
           path: /meetings/{id}/recordings/start
           method: post
           cors:
-            origin: 'http://localhost:3000'
+            origin: '*'
             headers:
               - Content-Type
               - X-Amz-Date
@@ -360,12 +379,12 @@ functions:
               - X-Api-Key
               - X-Amz-Security-Token
               - X-Amz-User-Agent
-            allowCredentials: true
+            allowCredentials: false
       - http:
           path: /meetings/{id}/recordings/stop
           method: post
           cors:
-            origin: 'http://localhost:3000'
+            origin: '*'
             headers:
               - Content-Type
               - X-Amz-Date
@@ -373,7 +392,7 @@ functions:
               - X-Api-Key
               - X-Amz-Security-Token
               - X-Amz-User-Agent
-            allowCredentials: true
+            allowCredentials: false
 
 
 
@@ -385,8 +404,69 @@ functions:
           arn: !GetAtt MeetingNotificationsQueue.Arn
           batchSize: 1
 
+  # Temporary function to wake up database
+  wake-db:
+    handler: src/lambda/wake-db.handler
+    timeout: 90
+    events:
+      - http:
+          path: /wake-db
+          method: get
+          cors:
+            origin: '*'
+            headers:
+              - Content-Type
+              - Authorization
+            allowCredentials: false
+
+  # Test real database connection
+  test-real-db:
+    handler: src/lambda/test-real-db.handler
+    timeout: 90
+    events:
+      - http:
+          path: /test-db
+          method: get
+          cors:
+            origin: '*'
+            headers:
+              - Content-Type
+              - Authorization
+            allowCredentials: false
+
+  # Keep database warm with scheduled pings
+  keep-db-warm:
+    handler: src/lambda/keep-db-warm.handler
+    timeout: 30
+    events:
+      - schedule: rate(4 minutes)
+
 resources:
   Resources:
+    # DynamoDB Table for meetings
+    MeetingsTable:
+      Type: AWS::DynamoDB::Table
+      Properties:
+        TableName: video-conferencing-meetings
+        BillingMode: PAY_PER_REQUEST
+        AttributeDefinitions:
+          - AttributeName: pk
+            AttributeType: S
+          - AttributeName: sk
+            AttributeType: S
+        KeySchema:
+          - AttributeName: pk
+            KeyType: HASH
+          - AttributeName: sk
+            KeyType: RANGE
+        TimeToLiveSpecification:
+          AttributeName: ttl
+          Enabled: true
+        StreamSpecification:
+          StreamViewType: NEW_AND_OLD_IMAGES
+        PointInTimeRecoverySpecification:
+          PointInTimeRecoveryEnabled: true
+
     # API Gateway
     ApiGatewayRestApi:
       Type: AWS::ApiGateway::RestApi

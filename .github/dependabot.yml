@@ -1,0 +1,57 @@
+version: 2
+updates:
+  # Frontend dependencies (Next.js)
+  - package-ecosystem: "npm"
+    directory: "/frontend-nextjs"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "06:00"
+    target-branch: "develop"
+    reviewers:
+      - "your-team"
+    assignees:
+      - "lead-developer"
+    commit-message:
+      prefix: "deps(frontend)"
+      include: "scope"
+    groups:
+      chime-sdk:
+        patterns:
+          - "amazon-chime-sdk-js"
+          - "@aws-sdk/*"
+        update-types:
+          - "minor"
+          - "patch"
+      
+  # Backend dependencies (Lambda)
+  - package-ecosystem: "npm" 
+    directory: "/"
+    schedule:
+      interval: "weekly" 
+      day: "monday"
+      time: "06:00"
+    target-branch: "develop"
+    reviewers:
+      - "your-team"
+    assignees:
+      - "lead-developer"
+    commit-message:
+      prefix: "deps(backend)"
+      include: "scope"
+    groups:
+      aws-sdk:
+        patterns:
+          - "@aws-sdk/*"
+        update-types:
+          - "minor"
+          - "patch"
+          
+  # GitHub Actions
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "monthly"
+    target-branch: "develop"
+    commit-message:
+      prefix: "ci"
