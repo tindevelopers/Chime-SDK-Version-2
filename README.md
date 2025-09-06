@@ -2,6 +2,8 @@
 
 A modern, scalable video conferencing platform built with AWS services and ChimeSDK integration.
 
+🔗 **Live Demo**: [video-conf-nextjs.vercel.app](https://video-conf-nextjs.vercel.app)
+
 ## 🏗️ Architecture
 
 ### Core Services
