@@ -1,7 +1,6 @@
 {
-  "version": 2,
   "functions": {
-    "frontend-nextjs/src/app/**/*.tsx": {
+    "src/app/**/*.tsx": {
       "maxDuration": 30
     }
   },
